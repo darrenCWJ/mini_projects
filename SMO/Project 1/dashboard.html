@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMO Incident Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .upload-section {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .upload-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .upload-box {
+            border: 2px dashed #6c757d;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-box:hover {
+            border-color: #007bff;
+            background: #f8f9ff;
+        }
+
+        .upload-box.dragover {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+            color: #6c757d;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .dashboard-content {
+            padding: 30px;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .kpi-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .kpi-card h3 {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .kpi-card .value {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .filters-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+
+        .filter-group select {
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            background: white;
+            font-size: 14px;
+        }
+
+        .tabs {
+            margin-top: 30px;
+        }
+
+        .tab-buttons {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 20px;
+        }
+
+        .tab-button {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: #6c757d;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            color: #007bff;
+            border-bottom-color: #007bff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #0056b3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        @media (max-width: 768px) {
+            .upload-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .tab-buttons {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SMO Incident Dashboard</h1>
+            <p>Auto-generated from Dashboard Metrics Tracker and incident data</p>
+        </div>
+
+        <div class="upload-section">
+            <div class="upload-grid">
+                <div class="upload-box" onclick="document.getElementById('csvFile').click()">
+                    <div class="upload-icon">📊</div>
+                    <h3>Incident CSV</h3>
+                    <p>Click to upload or drag & drop</p>
+                    <input type="file" id="csvFile" class="file-input" accept=".csv" />
+                </div>
+                <div class="upload-box" onclick="document.getElementById('excelFile').click()">
+                    <div class="upload-icon">📈</div>
+                    <h3>Metrics Tracker Excel</h3>
+                    <p>Click to upload or drag & drop</p>
+                    <input type="file" id="excelFile" class="file-input" accept=".xlsx,.xls" />
+                </div>
+            </div>
+            <div id="status"></div>
+            <button class="btn" onclick="generateSampleData()">Generate Sample Data</button>
+        </div>
+
+        <div class="dashboard-content" id="dashboardContent" style="display: none;">
+            <div class="kpi-grid" id="kpiGrid"></div>
+            
+            <div class="filters-section" id="filtersSection"></div>
+            
+            <div class="tabs" id="tabsSection"></div>
+        </div>
+    </div>
+
+    <script>
+        let incidentData = [];
+        let metricsSpec = [];
+        let filteredData = [];
+        let charts = {};
+
+        // File upload handlers
+        document.getElementById('csvFile').addEventListener('change', handleCSVUpload);
+        document.getElementById('excelFile').addEventListener('change', handleExcelUpload);
+
+        // Drag and drop handlers
+        document.querySelectorAll('.upload-box').forEach(box => {
+            box.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                box.classList.add('dragover');
+            });
+            
+            box.addEventListener('dragleave', () => {
+                box.classList.remove('dragover');
+            });
+            
+            box.addEventListener('drop', (e) => {
+                e.preventDefault();
+                box.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    if (box.querySelector('#csvFile')) {
+                        handleFile(files[0], 'csv');
+                    } else {
+                        handleFile(files[0], 'excel');
+                    }
+                }
+            });
+        });
+
+        function handleCSVUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file, 'csv');
+            }
+        }
+
+        function handleExcelUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file, 'excel');
+            }
+        }
+
+        function handleFile(file, type) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    if (type === 'csv') {
+                        const csv = Papa.parse(e.target.result, { header: true, skipEmptyLines: true });
+                        incidentData = csv.data;
+                        showStatus('CSV loaded successfully!', 'success');
+                    } else if (type === 'excel') {
+                        const workbook = XLSX.read(e.target.result, { type: 'binary' });
+                        const sheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[sheetName];
+                        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        
+                        // Process the last 3 columns as per requirements
+                        const processedData = processExcelData(json);
+                        metricsSpec = processedData;
+                        showStatus('Excel loaded successfully!', 'success');
+                    }
+                    
+                    if (incidentData.length > 0 && metricsSpec.length > 0) {
+                        renderDashboard();
+                    }
+                } catch (error) {
+                    showStatus(`Error loading ${type.toUpperCase()}: ${error.message}`, 'warning');
+                }
+            };
+            
+            if (type === 'csv') {
+                reader.readAsText(file);
+            } else {
+                reader.readAsBinaryString(file);
+            }
+        }
+
+        function processExcelData(json) {
+            // Remove empty rows and columns
+            const filtered = json.filter(row => row.some(cell => cell !== undefined && cell !== ''));
+            
+            if (filtered.length === 0) return [];
+            
+            // Get the last 3 columns
+            const maxCols = Math.max(...filtered.map(row => row.length));
+            const lastThreeCols = [];
+            
+            for (let i = 0; i < filtered.length; i++) {
+                const row = filtered[i];
+                const lastThree = [];
+                for (let j = Math.max(0, maxCols - 3); j < maxCols; j++) {
+                    lastThree.push(row[j] || '');
+                }
+                lastThreeCols.push(lastThree);
+            }
+            
+            // Convert to objects with proper column names
+            return lastThreeCols.map(row => ({
+                metric_column: row[0] || '',
+                filters: row[1] || '',
+                tables: row[2] || ''
+            })).filter(item => item.metric_column.trim() !== '');
+        }
+
+        function generateSampleData() {
+            // Generate sample incident data
+            incidentData = generateSampleIncidents();
+            
+            // Generate sample metrics spec
+            metricsSpec = generateSampleMetricsSpec();
+            
+            showStatus('Sample data generated successfully!', 'success');
+            renderDashboard();
+        }
+
+        function generateSampleIncidents() {
+            const priorities = ['High', 'Medium', 'Low', 'Critical'];
+            const statuses = ['Open', 'In Progress', 'Resolved', 'Closed', 'Pending'];
+            const categories = ['Hardware', 'Software', 'Network', 'Security', 'User Access'];
+            const departments = ['IT', 'HR', 'Finance', 'Operations', 'Sales'];
+            const assignees = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Wilson', 'David Brown'];
+            
+            const incidents = [];
+            for (let i = 1; i <= 150; i++) {
+                incidents.push({
+                    'Incident ID': `INC-${String(i).padStart(4, '0')}`,
+                    'Priority': priorities[Math.floor(Math.random() * priorities.length)],
+                    'Status': statuses[Math.floor(Math.random() * statuses.length)],
+                    'Category': categories[Math.floor(Math.random() * categories.length)],
+                    'Department': departments[Math.floor(Math.random() * departments.length)],
+                    'Assignee': assignees[Math.floor(Math.random() * assignees.length)],
+                    'Created Date': new Date(2024, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1).toISOString().split('T')[0],
+                    'Resolution Time (hours)': Math.floor(Math.random() * 72) + 1,
+                    'Severity': Math.floor(Math.random() * 5) + 1
+                });
+            }
+            return incidents;
+        }
+
+        function generateSampleMetricsSpec() {
+            return [
+                { metric_column: 'Priority', filters: 'Department,Status', tables: 'Overview,SLA' },
+                { metric_column: 'Status', filters: 'Priority,Category', tables: 'Overview' },
+                { metric_column: 'Category', filters: 'Department,Assignee', tables: 'Analysis' },
+                { metric_column: 'Department', filters: 'Priority,Status', tables: 'Overview,Analysis' },
+                { metric_column: 'Assignee', filters: 'Priority,Category', tables: 'Performance' },
+                { metric_column: 'Severity', filters: 'Department,Status', tables: 'SLA,Analysis' }
+            ];
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function renderDashboard() {
+            if (incidentData.length === 0 || metricsSpec.length === 0) return;
+            
+            filteredData = [...incidentData];
+            document.getElementById('dashboardContent').style.display = 'block';
+            
+            renderKPIs();
+            renderFilters();
+            renderTabs();
+        }
+
+        function renderKPIs() {
+            const kpiGrid = document.getElementById('kpiGrid');
+            const totalIncidents = filteredData.length;
+            const highPriority = filteredData.filter(item => item.Priority === 'High' || item.Priority === 'Critical').length;
+            const openStatus = filteredData.filter(item => ['Open', 'In Progress', 'Pending'].includes(item.Status)).length;
+            
+            kpiGrid.innerHTML = `
+                <div class="kpi-card">
+                    <h3>Total Incidents</h3>
+                    <div class="value">${totalIncidents.toLocaleString()}</div>
+                </div>
+                <div class="kpi-card">
+                    <h3>High Priority</h3>
+                    <div class="value">${highPriority.toLocaleString()}</div>
+                </div>
+                <div class="kpi-card">
+                    <h3>Open Status</h3>
+                    <div class="value">${openStatus.toLocaleString()}</div>
+                </div>
+            `;
+        }
+
+        function renderFilters() {
+            const filtersSection = document.getElementById('filtersSection');
+            const filterColumns = getFilterColumns();
+            
+            if (filterColumns.length === 0) {
+                filtersSection.innerHTML = '<h3>No filters configured</h3>';
+                return;
+            }
+            
+            let filtersHTML = '<h3>Filters</h3><div class="filters-grid">';
+            
+            filterColumns.forEach(column => {
+                const uniqueValues = [...new Set(filteredData.map(item => item[column]).filter(val => val))].sort();
+                filtersHTML += `
+                    <div class="filter-group">
+                        <label for="filter-${column}">${column}</label>
+                        <select id="filter-${column}" onchange="applyFilters()">
+                            <option value="">All</option>
+                            ${uniqueValues.map(value => `<option value="${value}">${value}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            });
+            
+            filtersHTML += '</div>';
+            filtersSection.innerHTML = filtersHTML;
+        }
+
+        function getFilterColumns() {
+            const filterColumns = new Set();
+            metricsSpec.forEach(spec => {
+                if (spec.filters) {
+                    spec.filters.split(/[,;]/).forEach(filter => {
+                        const trimmed = filter.trim();
+                        if (trimmed && incidentData.some(item => item.hasOwnProperty(trimmed))) {
+                            filterColumns.add(trimmed);
+                        }
+                    });
+                }
+            });
+            return Array.from(filterColumns);
+        }
+
+        function applyFilters() {
+            const filterColumns = getFilterColumns();
+            filteredData = [...incidentData];
+            
+            filterColumns.forEach(column => {
+                const select = document.getElementById(`filter-${column}`);
+                if (select && select.value) {
+                    filteredData = filteredData.filter(item => item[column] === select.value);
+                }
+            });
+            
+            renderKPIs();
+            renderTabs();
+        }
+
+        function renderTabs() {
+            const tabsSection = document.getElementById('tabsSection');
+            const tables = getTables();
+            
+            let tabsHTML = '<div class="tab-buttons">';
+            tables.forEach((table, index) => {
+                tabsHTML += `<button class="tab-button ${index === 0 ? 'active' : ''}" onclick="switchTab('${table}', ${index})">${table}</button>`;
+            });
+            tabsHTML += '</div>';
+            
+            tabsHTML += '<div class="tab-contents">';
+            tables.forEach((table, index) => {
+                tabsHTML += `<div class="tab-content ${index === 0 ? 'active' : ''}" id="tab-${table}">`;
+                tabsHTML += renderTableContent(table);
+                tabsHTML += '</div>';
+            });
+            tabsHTML += '</div>';
+            
+            tabsSection.innerHTML = tabsHTML;
+        }
+
+        function getTables() {
+            const tables = new Set();
+            metricsSpec.forEach(spec => {
+                if (spec.tables) {
+                    spec.tables.split(/[,;]/).forEach(table => {
+                        const trimmed = table.trim();
+                        if (trimmed) {
+                            tables.add(trimmed);
+                        }
+                    });
+                }
+            });
+            return Array.from(tables).length > 0 ? Array.from(tables) : ['Dashboard'];
+        }
+
+        function renderTableContent(tableName) {
+            const tableMetrics = metricsSpec.filter(spec => 
+                !spec.tables || spec.tables.split(/[,;]/).some(t => t.trim() === tableName)
+            );
+            
+            let content = '';
+            
+            tableMetrics.forEach(spec => {
+                const metricColumn = spec.metric_column;
+                if (!metricColumn || !filteredData.some(item => item.hasOwnProperty(metricColumn))) {
+                    return;
+                }
+                
+                // Create frequency table
+                const frequency = {};
+                filteredData.forEach(item => {
+                    const value = item[metricColumn] || '(Missing)';
+                    frequency[value] = (frequency[value] || 0) + 1;
+                });
+                
+                const sortedFreq = Object.entries(frequency)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10); // Top 10
+                
+                content += `
+                    <div class="chart-container">
+                        <h3>${metricColumn} Distribution</h3>
+                        <canvas id="chart-${metricColumn.replace(/\s+/g, '-')}" width="400" height="200"></canvas>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>${metricColumn}</th>
+                                    <th>Count</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${sortedFreq.map(([value, count]) => `
+                                    <tr>
+                                        <td>${value}</td>
+                                        <td>${count}</td>
+                                        <td>${((count / filteredData.length) * 100).toFixed(1)}%</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+            
+            return content;
+        }
+
+        function switchTab(tableName, index) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(`tab-${tableName}`).classList.add('active');
+            
+            // Render charts for this tab
+            setTimeout(() => {
+                renderChartsForTab(tableName);
+            }, 100);
+        }
+
+        function renderChartsForTab(tableName) {
+            const tableMetrics = metricsSpec.filter(spec => 
+                !spec.tables || spec.tables.split(/[,;]/).some(t => t.trim() === tableName)
+            );
+            
+            tableMetrics.forEach(spec => {
+                const metricColumn = spec.metric_column;
+                const canvasId = `chart-${metricColumn.replace(/\s+/g, '-')}`;
+                const canvas = document.getElementById(canvasId);
+                
+                if (!canvas) return;
+                
+                // Destroy existing chart if it exists
+                if (charts[canvasId]) {
+                    charts[canvasId].destroy();
+                }
+                
+                // Create frequency data
+                const frequency = {};
+                filteredData.forEach(item => {
+                    const value = item[metricColumn] || '(Missing)';
+                    frequency[value] = (frequency[value] || 0) + 1;
+                });
+                
+                const sortedFreq = Object.entries(frequency)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10);
+                
+                const ctx = canvas.getContext('2d');
+                charts[canvasId] = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: sortedFreq.map(([value]) => value),
+                        datasets: [{
+                            label: 'Count',
+                            data: sortedFreq.map(([, count]) => count),
+                            backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                            borderColor: 'rgba(102, 126, 234, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        // Initialize with sample data if no files are uploaded
+        window.addEventListener('load', () => {
+            showStatus('Upload CSV and Excel files, or click "Generate Sample Data" to start', 'info');
+        });
+    </script>
+</body>
+</html>
